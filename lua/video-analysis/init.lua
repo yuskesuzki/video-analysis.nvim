@@ -35,8 +35,15 @@ local function notify(msg, level)
   vim.notify(msg, level or vim.log.levels.INFO, { title = "Video Analysis" })
 end
 
+local function resolve_bufnr(bufnr)
+  if bufnr == nil or bufnr == 0 then
+    return vim.api.nvim_get_current_buf()
+  end
+  return bufnr
+end
+
 local function get_session(bufnr)
-  bufnr = bufnr or vim.api.nvim_get_current_buf()
+  bufnr = resolve_bufnr(bufnr)
   return sessions[bufnr]
 end
 
@@ -235,7 +242,7 @@ function M.on_finish(bufnr)
 end
 
 function M.start_mode(bufnr)
-  bufnr = bufnr or vim.api.nvim_get_current_buf()
+  bufnr = resolve_bufnr(bufnr)
 
   if sessions[bufnr] then
     notify("Video analysis mode is already active in this buffer.", vim.log.levels.WARN)
@@ -271,7 +278,7 @@ function M.start_mode(bufnr)
 end
 
 function M.stop_mode(bufnr)
-  bufnr = bufnr or vim.api.nvim_get_current_buf()
+  bufnr = resolve_bufnr(bufnr)
   local session = sessions[bufnr]
   if not session then
     return

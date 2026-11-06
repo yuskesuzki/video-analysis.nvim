@@ -29,8 +29,15 @@ end
 -- Keymap management
 local active_keymaps = {} -- bufnr -> list of lhs
 
+local function resolve_bufnr(bufnr)
+  if bufnr == nil or bufnr == 0 then
+    return vim.api.nvim_get_current_buf()
+  end
+  return bufnr
+end
+
 function M.setup_keymaps(bufnr, keymaps)
-  bufnr = bufnr or vim.api.nvim_get_current_buf()
+  bufnr = resolve_bufnr(bufnr)
   M.clear_keymaps(bufnr)
 
   local bound_keys = {}
@@ -48,7 +55,7 @@ function M.setup_keymaps(bufnr, keymaps)
 end
 
 function M.clear_keymaps(bufnr)
-  bufnr = bufnr or vim.api.nvim_get_current_buf()
+  bufnr = resolve_bufnr(bufnr)
   local keys = active_keymaps[bufnr]
   if not keys then
     return
