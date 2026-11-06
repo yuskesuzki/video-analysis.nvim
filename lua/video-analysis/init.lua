@@ -1,6 +1,8 @@
 local Timer = require("video-analysis.timer")
 local Buffer = require("video-analysis.buffer")
 
+local uv = vim.uv or vim.loop
+
 local M = {}
 
 M.defaults = {
@@ -11,6 +13,12 @@ M.defaults = {
     pause = "P",
     change_time = "C",
     stop = "E",
+  },
+  status = {
+    icon_play = "▶",
+    icon_pause = "⏸",
+    icon_stop = "⏹",
+    format = "%s %s [ch.%d]",
   },
 }
 
@@ -32,6 +40,59 @@ local function get_session(bufnr)
   return sessions[bufnr]
 end
 
+local function start_status_ticker(session)
+  if session.status_ticker then
+    return
+  end
+  local ticker = uv.new_timer()
+  ticker:start(
+    0,
+    500,
+    vim.schedule_wrap(function()
+      if session and session.timer and session.timer.is_running then
+        vim.cmd("redrawstatus")
+      end
+    end)
+  )
+  session.status_ticker = ticker
+end
+
+local function stop_status_ticker(session)
+  if session.status_ticker then
+    session.status_ticker:stop()
+    session.status_ticker:close()
+    session.status_ticker = nil
+  end
+  pcall(vim.cmd, "redrawstatus")
+end
+
+-- Public API for statusline / lualine
+function M.is_active(bufnr)
+  return get_session(bufnr) ~= nil
+end
+
+function M.status(bufnr)
+  local session = get_session(bufnr)
+  if not session then
+    return ""
+  end
+
+  local st_cfg = M.config.status
+  if not session.timer.is_running then
+    return string.format("%s 0:00:00 [S: Start]", st_cfg.icon_stop)
+  end
+
+  local curr_sec = session.timer:get_current_seconds()
+  local time_str = Timer.format_time(curr_sec)
+  local idx = session.timer.chapter_index
+
+  if session.timer.is_paused then
+    return string.format("%s %s [PAUSED ch.%d]", st_cfg.icon_pause, time_str, idx)
+  end
+
+  return string.format(st_cfg.format, st_cfg.icon_play, time_str, idx)
+end
+
 function M.on_start(bufnr)
   local session = get_session(bufnr)
   if not session then
@@ -39,6 +100,7 @@ function M.on_start(bufnr)
   end
 
   session.timer:start()
+  start_status_ticker(session)
   notify("Timer started! Press <Space> for chapter, 'P' to pause, 'C' to set time, 'E' to finish.")
 end
 
@@ -205,6 +267,7 @@ function M.start_mode(bufnr)
   })
 
   notify("Mode activated! Press 'S' to start timer, or 'E' to exit.")
+  pcall(vim.cmd, "redrawstatus")
 end
 
 function M.stop_mode(bufnr)
@@ -214,9 +277,11 @@ function M.stop_mode(bufnr)
     return
   end
 
+  stop_status_ticker(session)
   session.timer:reset()
   Buffer.clear_keymaps(bufnr)
   sessions[bufnr] = nil
+  pcall(vim.cmd, "redrawstatus")
 end
 
 return M

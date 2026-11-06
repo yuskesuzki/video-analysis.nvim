@@ -21,24 +21,33 @@
 
 ### LazyVim / lazy.nvim をお使いの場合
 
-ローカルプラグインとして読み込む設定例（`~/.config/nvim/lua/plugins/video-analysis.lua` 等に配置）：
+ローカルプラグインとして読み込み、かつステータスライン（lualine）の行末にリアルタイムタイマーを表示する設定例（`~/.config/nvim/lua/plugins/video-analysis.lua` に配置）：
 
 ```lua
 return {
   {
     dir = "~/Projects/nvim/video-analysis.nvim",
+    name = "video-analysis.nvim",
     cmd = { "VideoAnalysis", "VideoAnalysisStart", "VideoAnalysisStop" },
-    opts = {
-      -- オプション（デフォルト設定）
-      chapter_format = "%s - %s: chapter %d",
-      keymaps = {
-        start = "S",
-        next = "<Space>",
-        pause = "P",
-        change_time = "C",
-        stop = "E",
-      },
-    },
+    opts = {},
+  },
+  -- ステータスライン（lualine）へのリアルタイムカウンター追加
+  {
+    "nvim-lualine/lualine.nvim",
+    optional = true,
+    opts = function(_, opts)
+      opts.sections = opts.sections or {}
+      opts.sections.lualine_x = opts.sections.lualine_x or {}
+      table.insert(opts.sections.lualine_x, {
+        function()
+          return require("video-analysis").status()
+        end,
+        cond = function()
+          return package.loaded["video-analysis"] and require("video-analysis").is_active()
+        end,
+        color = { fg = "#ff9e64", gui = "bold" },
+      })
+    end,
   },
 }
 ```
