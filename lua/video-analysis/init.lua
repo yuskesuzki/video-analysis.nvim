@@ -4,7 +4,7 @@ local Buffer = require("video-analysis.buffer")
 local M = {}
 
 M.defaults = {
-  chapter_format = "%s - %s: chapter %d",
+  chapter_format = "%s - %s: %s",
   keymaps = {
     start = "S",
     next = "<Space>",
@@ -53,14 +53,28 @@ function M.on_next(bufnr)
     return
   end
 
+  -- Snapshot timestamp at the exact moment Space is pressed
   local start_str, end_str, idx = session.timer:next_chapter()
   if not start_str then
     return
   end
 
-  local line = string.format(M.config.chapter_format, start_str, end_str, idx)
-  Buffer.insert_chapter_line(bufnr, line)
-  notify(string.format("Chapter %d recorded: %s - %s", idx, start_str, end_str))
+  local default_title = string.format("chapter %d", idx)
+
+  vim.ui.input({
+    prompt = string.format("Note for chapter %d (%s - %s): ", idx, start_str, end_str),
+    default = default_title,
+  }, function(input)
+    local title = input
+    -- If user pressed <Esc> or entered empty text, fall back to default chapter name
+    if not title or vim.trim(title) == "" then
+      title = default_title
+    end
+
+    local line = string.format(M.config.chapter_format, start_str, end_str, title)
+    Buffer.insert_chapter_line(bufnr, line)
+    notify(string.format("Recorded: %s", line))
+  end)
 end
 
 function M.on_pause(bufnr)
@@ -136,14 +150,26 @@ function M.on_finish(bufnr)
 
   if session.timer.is_running then
     local start_str, end_str, idx = session.timer:finish()
-    local line = string.format(M.config.chapter_format, start_str, end_str, idx)
-    Buffer.insert_chapter_line(bufnr, line)
-    notify(string.format("Finished! Total chapters: %d (%s - %s)", idx, start_str, end_str))
+    local default_title = string.format("chapter %d", idx)
+
+    vim.ui.input({
+      prompt = string.format("Note for final chapter %d (%s - %s): ", idx, start_str, end_str),
+      default = default_title,
+    }, function(input)
+      local title = input
+      if not title or vim.trim(title) == "" then
+        title = default_title
+      end
+
+      local line = string.format(M.config.chapter_format, start_str, end_str, title)
+      Buffer.insert_chapter_line(bufnr, line)
+      notify(string.format("Finished! Recorded final chapter: %s", line))
+      M.stop_mode(bufnr)
+    end)
   else
     notify("Finished (timer was not running).")
+    M.stop_mode(bufnr)
   end
-
-  M.stop_mode(bufnr)
 end
 
 function M.start_mode(bufnr)
